@@ -1,0 +1,106 @@
+---
+title: "VIC House"
+output: flexdashboard::flex_dashboard
+---
+
+### Median House Sales by Suburb
+
+```{r}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(stringr)
+library(leaflet)
+library(sf)
+library(tidyr)
+library(readxl)
+
+# Read data
+data_map <- read_sf(file.path(getwd(), "VIC_shape/vic_localities.shp"))
+house <- read.csv(file.path(getwd(), "real_estate_data.csv") )
+
+# Prepare data
+house_median <- house %>%
+  mutate(X = str_to_upper(X))
+
+data_map <- data_map %>%
+  mutate(LOC_NAME = toupper(LOC_NAME))
+
+# Join datasets
+house_data_map <- data_map %>%
+  left_join(house_median, by = c("LOC_NAME" = "X"))
+
+# Filter only house-related data
+house_data_map <- house_data_map %>%
+  filter(!is.na(House.2.BR) | !is.na(House.3.BR) | !is.na(House.4.BR) | !is.na(House.5.BR))
+
+# Define a single color palette for all house sizes
+all_prices <- c(house_data_map$House.2.BR, house_data_map$House.3.BR, 
+                house_data_map$House.4.BR, house_data_map$House.5.BR)
+
+pal_unified <- colorNumeric("Blues", domain = all_prices, reverse = FALSE)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = 145.04195, lat = -37.8136, zoom = 9) %>%
+  addControl(
+    html = "<h3 style='text-align: center;'>Victorian Median Property Prices by Suburb (Q2 2024) - Houses</h3>",
+    position = "topright"
+  ) %>%
+  # Add polygons for each house category using the same palette
+  addPolygons(
+    data = house_data_map,
+    fillColor = ~pal_unified(House.2.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 2BR House Median Price:", format(House.2.BR, scientific = FALSE, big.mark = ",")),
+    group = "House 2 BR"
+  ) %>%
+  addPolygons(
+    data = house_data_map,
+    fillColor = ~pal_unified(House.3.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 3BR House Median Price:", format(House.3.BR, scientific = FALSE, big.mark = ",")),
+    group = "House 3 BR"
+  ) %>%
+  addPolygons(
+    data = house_data_map,
+    fillColor = ~pal_unified(House.4.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 4BR House Median Price:", format(House.4.BR, scientific = FALSE, big.mark = ",")),
+    group = "House 4 BR"
+  ) %>%
+  addPolygons(
+    data = house_data_map,
+    fillColor = ~pal_unified(House.5.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 5BR House Median Price:", format(House.5.BR, scientific = FALSE, big.mark = ",")),
+    group = "House 5 BR"
+  ) %>%
+  # Add a single legend for all layers
+  addLegend(
+    pal = pal_unified, values = all_prices, 
+    title = "House Median Prices",
+    position = "bottomright", opacity = 1
+  ) %>%
+  # Use baseGroups to allow only one layer selection at a time
+  addLayersControl(
+    baseGroups = c("House 2 BR", "House 3 BR", "House 4 BR", "House 5 BR"),
+    position = "bottomleft",
+    options = layersControlOptions(collapsed = FALSE)
+  ) 
+
+```
+
+
+

@@ -1,0 +1,96 @@
+---
+title: "VIC Unit"
+output: flexdashboard::flex_dashboard
+---
+
+### Median Unit Sales by Suburb
+
+```{r}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(stringr)
+library(leaflet)
+library(sf)
+library(tidyr)
+library(readxl)
+
+# Read data
+data_map <- read_sf(file.path(getwd(), "VIC_shape/vic_localities.shp"))
+house <- read.csv(file.path(getwd(), "real_estate_data.csv") )
+
+# Prepare data
+house_median <- house %>%
+  mutate(X = str_to_upper(X))
+
+data_map <- data_map %>%
+  mutate(LOC_NAME = toupper(LOC_NAME))
+
+# Join datasets
+house_data_map <- data_map %>%
+  left_join(house_median, by = c("LOC_NAME" = "X"))
+
+# Filter only unit-related data
+unit_data_map <- house_data_map %>%
+  filter(!is.na(Unit.1.BR) | !is.na(Unit.2.BR) | !is.na(Unit.3.BR))  # Keep rows with unit data
+
+# Define a single color palette for all unit types
+all_unit_prices <- c(unit_data_map$Unit.1.BR, unit_data_map$Unit.2.BR, unit_data_map$Unit.3.BR)
+pal_unified <- colorNumeric("Reds", domain = all_unit_prices, reverse = FALSE)
+
+# Create the leaflet map
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = 145.04195, lat = -37.8136, zoom = 9) %>%
+  addControl(
+    html = "<h3 style='text-align: center;'>Victorian Median Property Prices by Suburb (Q2 2024) - Units</h3>",
+    position = "topright"
+  ) %>%
+  # Add layers for unit data with the same palette
+  addPolygons(
+    data = unit_data_map,
+    fillColor = ~pal_unified(Unit.1.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 1BR Unit Median Price:", format(Unit.1.BR, scientific = FALSE, big.mark = ",")),
+    group = "Unit 1 BR"
+  ) %>%
+  addPolygons(
+    data = unit_data_map,
+    fillColor = ~pal_unified(Unit.2.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 2BR Unit Median Price:", format(Unit.2.BR, scientific = FALSE, big.mark = ",")),
+    group = "Unit 2 BR"
+  ) %>%
+  addPolygons(
+    data = unit_data_map,
+    fillColor = ~pal_unified(Unit.3.BR),
+    opacity = 1,
+    color = "black",
+    fillOpacity = 0.7,
+    weight = 0.5,
+    label = ~paste(LOC_NAME, "- 3BR Unit Median Price:", format(Unit.3.BR, scientific = FALSE, big.mark = ",")),
+    group = "Unit 3 BR"
+  ) %>%
+  # Add a single unified legend
+  addLegend(
+    pal = pal_unified, values = all_unit_prices, 
+    title = "Unit Median Prices (All Types)",
+    position = "bottomright", opacity = 1
+  ) %>%
+  # Use baseGroups to allow only one layer selection at a time
+  addLayersControl(
+    baseGroups = c("Unit 1 BR", "Unit 2 BR", "Unit 3 BR"),
+    position = "bottomleft",
+    options = layersControlOptions(collapsed = FALSE)
+  ) 
+
+
+```
+
+
+
